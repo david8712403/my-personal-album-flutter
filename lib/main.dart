@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:my_album/screen/album_screen.dart';
 import 'package:my_album/screen/setting_screen.dart';
 import 'package:my_album/screen/media_screen.dart';
+import 'package:my_album/service/db.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  Db.db();
   runApp(const MyApp());
 }
 
