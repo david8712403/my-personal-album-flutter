@@ -6,7 +6,7 @@ import 'package:my_album/service/db.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  Db.db();
+  await Db.init();
   runApp(const MyApp());
 }
 

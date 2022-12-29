@@ -6,7 +6,7 @@ import 'package:sqflite/sqflite.dart';
 class Db {
   static const dbName = 'my_album.db';
   static Database? _db;
-  static Future<Database> db() async {
+  static Future<Database> init() async {
     if (_db != null) {
       return _db!;
     }
@@ -36,7 +36,7 @@ class Db {
     _db?.close();
     _db = null;
     await File(join(await getDatabasesPath(), dbName)).delete();
-    db();
+    init();
   }
 
   // Tables
@@ -50,5 +50,12 @@ class Db {
       media.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  static Future<List<Media>> medias() async {
+    final List<Map<String, dynamic>> maps = await _db!.query(TableMedia);
+    return List.generate(maps.length, (i) {
+      return Media.fromMap(maps[i]);
+    });
   }
 }

@@ -12,19 +12,32 @@ class MediaScreen extends StatefulWidget {
 }
 
 class _MediaScreenState extends State<MediaScreen> {
+  List<Media> _medias = [];
+  @override
+  void initState() {
+    fetchMedias();
+    super.initState();
+  }
+
+  void fetchMedias() async {
+    final medias = await Db.medias();
+    print(medias);
+    setState(() {
+      _medias = medias;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: GridView.count(
         crossAxisCount: 3,
-        children: List.generate(100, (index) {
-          return Center(
-            child: Text(
-              'Item $index',
-              style: Theme.of(context).textTheme.headline5,
-            ),
-          );
-        }),
+        children: _medias
+            .map((e) => Image.network(
+                  e.previewImageUrl,
+                  fit: BoxFit.cover,
+                ))
+            .toList(),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async => {
@@ -35,18 +48,20 @@ class _MediaScreenState extends State<MediaScreen> {
                 await AutoMediaService.getMediaMessage(value.text!);
             for (final m in messages) {
               print(m.toString());
-              Db.insertMedia(Media(
+              await Db.insertMedia(Media(
                   path: "",
                   name: "",
                   type: m.type,
                   previewImageUrl: m.previewImageUrl,
                   originalContentUrl: m.originalContentUrl));
+              fetchMedias();
             }
           })
         },
         tooltip: 'add',
         child: const Icon(Icons.add),
       ),
+      // floatingActionButton:
     );
   }
 }
