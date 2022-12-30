@@ -43,6 +43,7 @@ dependencies:
   flutter_downloader: ^1.9.1
   uuid: ^3.0.6
   loading_indicator: ^3.1.0
+  image: ^3.3.0
 
 dev_dependencies:
   flutter_test:

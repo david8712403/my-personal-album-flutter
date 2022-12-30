@@ -21,6 +21,8 @@ class MediaScreen extends StatefulWidget {
 }
 
 class _MediaScreenState extends State<MediaScreen> {
+  final ScrollController _controller = ScrollController();
+
   List<Media> _medias = [];
   late bool _showContent;
   late bool _permissionReady;
@@ -72,7 +74,8 @@ class _MediaScreenState extends State<MediaScreen> {
       while (retry < 100) {
         retry++;
         final tasks = await FlutterDownloader.loadTasksWithRawQuery(
-            query: "SELECT * FROM task WHERE task_id='$taskId'");
+            query:
+                "SELECT * FROM task WHERE task_id='$taskId' ORDER BY time_created DESC");
         if (tasks == null || tasks.isEmpty) {
           // Retry to query task, only happend in iOS(?)
           await Future.delayed(const Duration(milliseconds: 100));
@@ -87,6 +90,7 @@ class _MediaScreenState extends State<MediaScreen> {
           final medias = await Db.medias();
           setState(() => _medias = medias);
         });
+        _scrollDown();
         return;
       }
       print("$taskId=>update local path FAILED!!!!");
@@ -172,13 +176,23 @@ class _MediaScreenState extends State<MediaScreen> {
         tooltip: 'add',
         child: const Icon(Icons.add),
       ),
-      // floatingActionButton:
+    );
+  }
+
+  void _scrollDown() {
+    _controller.animateTo(
+      _controller.position.maxScrollExtent,
+      duration: const Duration(microseconds: 500),
+      curve: Curves.fastOutSlowIn,
     );
   }
 
   Widget buildGridView() {
     return GridView.count(
       crossAxisCount: 3,
+      controller: _controller,
+      mainAxisSpacing: 1,
+      crossAxisSpacing: 1,
       children: _medias.map((e) {
         if (e.previewImagePath == null) {
           return Container(
@@ -201,6 +215,8 @@ class _MediaScreenState extends State<MediaScreen> {
           // 不知道為什麼這裡用join合併路徑沒用...
           File('${_appDocDir.path}${e.previewImagePath!}'),
           fit: BoxFit.cover,
+          cacheWidth: 180,
+          gaplessPlayback: true,
         );
       }).toList(),
     );

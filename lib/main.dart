@@ -9,6 +9,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Db.getInstance();
   await FlutterDownloader.initialize(debug: true, ignoreSsl: true);
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 1000 << 25;
   runApp(const MyApp());
 }
 
