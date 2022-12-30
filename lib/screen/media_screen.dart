@@ -3,6 +3,7 @@ import 'dart:isolate';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:loading_indicator/loading_indicator.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:my_album/model/database/media.dart';
@@ -26,10 +27,12 @@ class _MediaScreenState extends State<MediaScreen> {
   late bool _saveInPublicStorage;
   late String _localPath;
   final ReceivePort _port = ReceivePort();
+  late Directory _appDocDir;
 
   @override
   void initState() {
     super.initState();
+    getApplicationDocumentsDirectory().then((value) => _appDocDir = value);
 
     _bindBackgroundIsolate();
 
@@ -62,27 +65,36 @@ class _MediaScreenState extends State<MediaScreen> {
       final status = data[1] as DownloadTaskStatus;
       final progress = data[2] as int;
 
-      // print(
-      //   'Callback on UI isolate: '
-      //   'task ($taskId) is in status ($status) and process ($progress)',
-      // );
-      if (status == DownloadTaskStatus.complete) {
-        print('task ($taskId) finished!');
-        FlutterDownloader.loadTasksWithRawQuery(
-                query: "SELECT * FROM task WHERE task_id='$taskId'")
-            .then((value) {
-          final task = value!.first;
-          final path = join(task.savedDir, task.filename);
-          print("$taskId=>update local image");
-          Db.updateLocalMediaPath(task.taskId, path);
+      if (status != DownloadTaskStatus.complete) return;
+
+      print('task ($taskId) finished!');
+      int retry = 0;
+      while (retry < 100) {
+        retry++;
+        final tasks = await FlutterDownloader.loadTasksWithRawQuery(
+            query: "SELECT * FROM task WHERE task_id='$taskId'");
+        if (tasks == null || tasks.isEmpty) {
+          // Retry to query task, only happend in iOS(?)
+          await Future.delayed(const Duration(milliseconds: 100));
+          continue;
+        }
+
+        final task = tasks[0];
+        final saveRelativePath = task.savedDir.replaceAll(_appDocDir.path, '');
+        final path = join(saveRelativePath, task.filename);
+        print("$taskId=>update local path (try $retry times...)");
+        Db.updateLocalMediaPath(task.taskId, path).then((value) async {
+          final medias = await Db.medias();
+          setState(() => _medias = medias);
         });
+        return;
       }
+      print("$taskId=>update local path FAILED!!!!");
     });
   }
 
-  void _unbindBackgroundIsolate() {
-    IsolateNameServer.removePortNameMapping('downloader_send_port');
-  }
+  void _unbindBackgroundIsolate() =>
+      IsolateNameServer.removePortNameMapping('downloader_send_port');
 
   @pragma('vm:entry-point')
   static Future<void> downloadCallback(
@@ -96,24 +108,30 @@ class _MediaScreenState extends State<MediaScreen> {
 
   Future<void> fetchMedias() async {
     final medias = await Db.medias();
-    setState(() {
-      _medias = medias;
-    });
+    setState(() => _medias = medias);
   }
 
   Future<void> importMedia(AutoMediaMessageItem m) async {
-    final appDocDir = await getApplicationDocumentsDirectory();
-
     final name = const Uuid().v4();
-    final previewPath = join(appDocDir.path, "image");
-    final originalPath = join(appDocDir.path, m.type);
+    final previewPath = join(_appDocDir.path, "image");
+    final originalPath = join(_appDocDir.path, m.type);
     await Directory(previewPath).create(recursive: true);
     await Directory(originalPath).create(recursive: true);
 
     final previewTask = await FlutterDownloader.enqueue(
-        url: m.previewImageUrl, savedDir: previewPath);
+      url: m.previewImageUrl,
+      savedDir: previewPath,
+      showNotification: false,
+      openFileFromNotification: false,
+      fileName: "$name-preview",
+    );
     final originalTask = await FlutterDownloader.enqueue(
-        url: m.originalContentUrl, savedDir: originalPath);
+      url: m.originalContentUrl,
+      savedDir: originalPath,
+      showNotification: false,
+      openFileFromNotification: false,
+      fileName: "$name-original",
+    );
 
     await Db.insertMedia(
       Media(
@@ -133,9 +151,6 @@ class _MediaScreenState extends State<MediaScreen> {
       print(value?.text);
       if (value == null || value.text == null) return;
       final messages = await AutoMediaService.getMediaMessage(value.text!);
-      // final url =
-      //     "https://twitter.com/cat_auras/status/1608543984099680261/photo/1";
-      // final messages = await AutoMediaService.getMediaMessage(url);
       for (final m in messages) {
         await importMedia(m);
       }
@@ -149,21 +164,7 @@ class _MediaScreenState extends State<MediaScreen> {
       body: RefreshIndicator(
         child: _medias.isEmpty
             ? const Center(child: Text("No data"))
-            : GridView.count(
-                crossAxisCount: 3,
-                children: _medias.map((e) {
-                  if (e.previewImagePath == null) {
-                    return Image.network(e.previewImageUrl, fit: BoxFit.cover);
-                  }
-                  return Stack(
-                    children: [
-                      Image.file(File(e.previewImagePath!), fit: BoxFit.cover),
-                      const Text("local file",
-                          style: TextStyle(color: Colors.white))
-                    ],
-                  );
-                }).toList(),
-              ),
+            : buildGridView(),
         onRefresh: () async => fetchMedias(),
       ),
       floatingActionButton: FloatingActionButton(
@@ -172,6 +173,36 @@ class _MediaScreenState extends State<MediaScreen> {
         child: const Icon(Icons.add),
       ),
       // floatingActionButton:
+    );
+  }
+
+  Widget buildGridView() {
+    return GridView.count(
+      crossAxisCount: 3,
+      children: _medias.map((e) {
+        if (e.previewImagePath == null) {
+          return Container(
+            padding: const EdgeInsets.all(8),
+            alignment: AlignmentDirectional.bottomEnd,
+            decoration: BoxDecoration(
+                image: DecorationImage(
+              image: NetworkImage(e.previewImageUrl),
+              fit: BoxFit.cover,
+            )),
+            child: const LoadingIndicator(
+              indicatorType: Indicator.ballBeat,
+              colors: [Colors.white],
+              strokeWidth: 2.0,
+              pathBackgroundColor: Colors.black45,
+            ),
+          );
+        }
+        return Image.file(
+          // 不知道為什麼這裡用join合併路徑沒用...
+          File('${_appDocDir.path}${e.previewImagePath!}'),
+          fit: BoxFit.cover,
+        );
+      }).toList(),
     );
   }
 }

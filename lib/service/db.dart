@@ -66,11 +66,17 @@ class Db {
   }
 
   static Future<void> updateLocalMediaPath(String taskId, String path) async {
-    _db!.rawUpdate(
-        "UPDATE media SET previewImagePath = ? WHERE previewTaskId = ?",
-        [path, taskId]);
-    _db!.rawUpdate(
-        'UPDATE media SET originalContentPath = ? WHERE originalTaskId = ?',
-        [path, taskId]);
+    await _db!.update(
+      TableMedia,
+      {"previewImagePath": path},
+      where: "previewTaskId = ?",
+      whereArgs: [taskId],
+    );
+    await _db!.update(
+      TableMedia,
+      {"originalContentPath": path},
+      where: "originalTaskId = ?",
+      whereArgs: [taskId],
+    );
   }
 }

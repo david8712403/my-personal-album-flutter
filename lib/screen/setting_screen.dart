@@ -51,10 +51,14 @@ class _SettingScreenState extends State<SettingScreen> {
         final appDocDir = await getApplicationDocumentsDirectory();
         final imagePath = join(appDocDir.path, "image");
         final videoPath = join(appDocDir.path, "video");
-        print("delete $imagePath");
-        await Directory(imagePath).delete(recursive: true);
-        print("delete $videoPath");
-        await Directory(videoPath).delete(recursive: true);
+        if (await Directory(imagePath).exists()) {
+          print("delete $imagePath");
+          await Directory(imagePath).delete(recursive: true);
+        }
+        if (await Directory(videoPath).exists()) {
+          print("delete $videoPath");
+          await Directory(videoPath).delete(recursive: true);
+        }
         Navigator.pop(context);
       },
     );
