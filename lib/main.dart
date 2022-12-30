@@ -36,7 +36,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 1;
 
   void _onItemTapped(int index) {
     setState(() {
@@ -49,17 +49,17 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: const [MediaScreen(), AlbumScreen(), SettingScreen()],
+        children: const [AlbumScreen(), MediaScreen(), SettingScreen()],
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.photo),
-            label: 'Media',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.photo_album),
             label: 'Album',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.photo),
+            label: 'Media',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),

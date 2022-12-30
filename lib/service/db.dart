@@ -13,9 +13,9 @@ class Db {
 
     final database = await openDatabase(
       join(await getDatabasesPath(), dbName),
-      onCreate: (db, version) {
+      onCreate: (db, version) async {
         print("init tables");
-        return db.execute('CREATE TABLE media('
+        await db.execute('CREATE TABLE media('
             'id INTEGER PRIMARY KEY AUTOINCREMENT,'
             'created TEXT NOT NULL,'
             'name TEXT,'
@@ -27,7 +27,12 @@ class Db {
             'originalContentUrl TEXT NOT NULL,'
             'originalContentPath TEXT,'
             'originalTaskId TEXT NOT NULL)');
+        // await db.execute('CREATE TABLE tag('
+        //     'id INTEGER PRIMARY KEY AUTOINCREMENT,'
+        //     'name TEXT NOT NULL UNIQUE,'
+        //     ')');
       },
+      onConfigure: ((db) => db.execute('PRAGMA foreign_keys = ON')),
       version: 1,
     );
     _db = database;

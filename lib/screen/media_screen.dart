@@ -3,6 +3,7 @@ import 'dart:isolate';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:anim_search_bar/anim_search_bar.dart';
 import 'package:loading_indicator/loading_indicator.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -11,6 +12,8 @@ import 'package:my_album/service/auto_media.dart';
 import 'package:my_album/service/db.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:photo_view/photo_view_gallery.dart';
 import 'package:uuid/uuid.dart';
 
 class MediaScreen extends StatefulWidget {
@@ -21,7 +24,8 @@ class MediaScreen extends StatefulWidget {
 }
 
 class _MediaScreenState extends State<MediaScreen> {
-  final ScrollController _controller = ScrollController();
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _textController = TextEditingController();
 
   List<Media> _medias = [];
   late bool _showContent;
@@ -168,7 +172,27 @@ class _MediaScreenState extends State<MediaScreen> {
       body: RefreshIndicator(
         child: _medias.isEmpty
             ? const Center(child: Text("No data"))
-            : buildGridView(),
+            : Stack(
+                children: [
+                  buildGridView(context),
+                  Positioned(
+                    top: 0,
+                    right: 25,
+                    child: AnimSearchBar(
+                      width: MediaQuery.of(context).size.width - 50,
+                      textController: _textController,
+                      onSuffixTap: () {
+                        setState(() {
+                          _textController.clear();
+                        });
+                      },
+                      onSubmitted: (text) {
+                        print(text);
+                      },
+                    ),
+                  )
+                ],
+              ),
         onRefresh: () async => fetchMedias(),
       ),
       floatingActionButton: FloatingActionButton(
@@ -180,17 +204,17 @@ class _MediaScreenState extends State<MediaScreen> {
   }
 
   void _scrollDown() {
-    _controller.animateTo(
-      _controller.position.maxScrollExtent,
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
       duration: const Duration(microseconds: 500),
       curve: Curves.fastOutSlowIn,
     );
   }
 
-  Widget buildGridView() {
+  Widget buildGridView(BuildContext context) {
     return GridView.count(
       crossAxisCount: 3,
-      controller: _controller,
+      controller: _scrollController,
       mainAxisSpacing: 1,
       crossAxisSpacing: 1,
       children: _medias.map((e) {
@@ -211,12 +235,46 @@ class _MediaScreenState extends State<MediaScreen> {
             ),
           );
         }
-        return Image.file(
-          // 不知道為什麼這裡用join合併路徑沒用...
-          File('${_appDocDir.path}${e.previewImagePath!}'),
-          fit: BoxFit.cover,
-          cacheWidth: 180,
-          gaplessPlayback: true,
+        return InkWell(
+          onTap: () => showDialog(
+            context: context,
+            builder: ((context) => Dialog(
+                insetPadding: const EdgeInsets.all(0),
+                child: PhotoViewGallery.builder(
+                  pageController:
+                      PageController(initialPage: _medias.indexOf(e)),
+                  scrollPhysics: const BouncingScrollPhysics(),
+                  builder: (BuildContext context, int index) {
+                    return PhotoViewGalleryPageOptions(
+                      imageProvider: AssetImage(
+                          '${_appDocDir.path}${_medias[index].previewImagePath!}'),
+                      // initialScale: PhotoViewComputedScale.contained * 0.8,
+                      heroAttributes:
+                          PhotoViewHeroAttributes(tag: _medias[index]),
+                    );
+                  },
+                  itemCount: _medias.length,
+                  loadingBuilder: (context, event) => Center(
+                    child: SizedBox(
+                      width: 20.0,
+                      height: 20.0,
+                      child: CircularProgressIndicator(
+                        value: event == null
+                            ? 0
+                            : event.cumulativeBytesLoaded /
+                                event.expectedTotalBytes!,
+                      ),
+                    ),
+                  ),
+                ))),
+          ),
+          child: Image.file(
+            // 不知道為什麼這裡用join合併路徑沒用...
+            File('${_appDocDir.path}${e.previewImagePath!}'),
+            fit: BoxFit.cover,
+            cacheWidth: 180,
+            gaplessPlayback: true,
+          ),
         );
       }).toList(),
     );
