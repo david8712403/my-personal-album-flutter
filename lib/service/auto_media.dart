@@ -10,7 +10,7 @@ class AutoMediaService {
     final response =
         await http.get(Uri.https(host, "/v2/mediaGetter", {"url": encodeUrl}));
     if (response.statusCode == 200) {
-      return MediaGetterResponse.fromMap(jsonDecode(response.body)).messages;
+      return MediaGetterResponse.fromJson(response.body).messages;
     } else {
       throw Exception('Failed to load album');
     }

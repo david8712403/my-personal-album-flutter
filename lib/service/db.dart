@@ -6,25 +6,31 @@ import 'package:sqflite/sqflite.dart';
 class Db {
   static const dbName = 'my_album.db';
   static Database? _db;
-  static Future<Database> init() async {
+  static Future<Database> getInstance() async {
     if (_db != null) {
       return _db!;
     }
 
-    final database = openDatabase(
+    final database = await openDatabase(
       join(await getDatabasesPath(), dbName),
       onCreate: (db, version) {
-        return db.execute("""CREATE TABLE media(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          path TEXT,
-          name TEXT,
-          type TEXT,
-          previewImageUrl TEXT,
-          originalContentUrl TEXT)""");
+        print("init tables");
+        return db.execute('CREATE TABLE media('
+            'id INTEGER PRIMARY KEY AUTOINCREMENT,'
+            'created TEXT NOT NULL,'
+            'name TEXT,'
+            'description TEXT,'
+            'type TEXT NOT NULL,'
+            'previewImageUrl TEXT NOT NULL,'
+            'previewImagePath TEXT,'
+            'previewTaskId TEXT NOT NULL,'
+            'originalContentUrl TEXT NOT NULL,'
+            'originalContentPath TEXT,'
+            'originalTaskId TEXT NOT NULL)');
       },
       version: 1,
     );
-    _db = await database;
+    _db = database;
     return database;
   }
 
@@ -33,10 +39,10 @@ class Db {
       _db?.execute('DROP TABLE IF EXISTS $t');
       print('drop $t');
     }
-    _db?.close();
+    await _db?.close();
     _db = null;
     await File(join(await getDatabasesPath(), dbName)).delete();
-    init();
+    await getInstance();
   }
 
   // Tables
@@ -57,5 +63,14 @@ class Db {
     return List.generate(maps.length, (i) {
       return Media.fromMap(maps[i]);
     });
+  }
+
+  static Future<void> updateLocalMediaPath(String taskId, String path) async {
+    _db!.rawUpdate(
+        "UPDATE media SET previewImagePath = ? WHERE previewTaskId = ?",
+        [path, taskId]);
+    _db!.rawUpdate(
+        'UPDATE media SET originalContentPath = ? WHERE originalTaskId = ?',
+        [path, taskId]);
   }
 }

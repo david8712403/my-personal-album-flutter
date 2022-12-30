@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:my_album/screen/album_screen.dart';
 import 'package:my_album/screen/setting_screen.dart';
 import 'package:my_album/screen/media_screen.dart';
@@ -6,7 +7,8 @@ import 'package:my_album/service/db.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Db.init();
+  await Db.getInstance();
+  await FlutterDownloader.initialize(debug: true, ignoreSsl: true);
   runApp(const MyApp());
 }
 
